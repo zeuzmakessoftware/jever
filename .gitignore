@@ -1,0 +1,8 @@
+node_modules/
+out/
+release/
+coverage/
+.DS_Store
+.env*
+*.log
+test-results/
