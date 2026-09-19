@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import * as Popover from '@radix-ui/react-popover'
 import {
   ArrowRight,
   ArrowUp,
-  ArrowUpRight,
-  BookOpen,
+  CaretDown,
   ChatCircle,
   Check,
   DotsThree,
@@ -15,14 +15,11 @@ import {
   Plus,
   SidebarSimple,
   SlidersHorizontal,
-  SquaresFour,
   Stop,
   Trash,
   X,
   PushPin,
   PencilSimple,
-  Lightning,
-  Scales,
 } from '@phosphor-icons/react'
 import {
   DEFAULT_QUESTIONS,
@@ -36,7 +33,7 @@ import {
   type Workspace,
   type Settings,
 } from '../../shared/domain'
-import { bridge, download, isDesktop, message } from './bridge'
+import { bridge, download, message } from './bridge'
 import { Glider, IconButton, Modal } from './components/Primitives'
 import { QuestionEditor } from './components/QuestionEditor'
 import { Results } from './components/Results'
@@ -57,10 +54,8 @@ export default function App() {
   const [search, setSearch] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [presetsOpen, setPresetsOpen] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [inspectorOpen, setInspectorOpen] = useState(
-    () => matchMedia('(min-width: 1180px)').matches,
-  )
+  const [sidebarOpen, setSidebarOpen] = useState(() => matchMedia('(min-width: 768px)').matches)
+  const [inspectorOpen, setInspectorOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [configured, setConfigured] = useState(false)
   const [running, setRunning] = useState<{ requestId: string; conversationId: string } | null>(null)
@@ -142,6 +137,7 @@ export default function App() {
   }, [conversation?.turns.length, running])
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
         setSidebarOpen(true)
@@ -156,7 +152,7 @@ export default function App() {
         setSettingsOpen(true)
       }
       if (event.key === 'Escape') {
-        setSidebarOpen(false)
+        if (!matchMedia('(min-width: 768px)').matches) setSidebarOpen(false)
         setInspectorOpen(false)
         setMenuOpen(false)
       }
@@ -174,7 +170,8 @@ export default function App() {
     setAttachments([])
     setQuestions(structuredClone(DEFAULT_QUESTIONS))
     setError('')
-    setSidebarOpen(false)
+    if (!matchMedia('(min-width: 768px)').matches) setSidebarOpen(false)
+    setInspectorOpen(false)
     textRef.current?.focus()
   }
   function selectConversation(item: Conversation) {
@@ -183,7 +180,8 @@ export default function App() {
     setDraft('')
     setAttachments([])
     setError('')
-    setSidebarOpen(false)
+    if (!matchMedia('(min-width: 768px)').matches) setSidebarOpen(false)
+    setInspectorOpen(false)
   }
   function changeQuestions(next: Questions) {
     setQuestions(next)
@@ -455,13 +453,8 @@ export default function App() {
       </main>
     )
   return (
-    <div
-      className={`app-shell ${inspectorOpen ? 'show-inspector' : ''} ${sidebarOpen ? 'show-sidebar' : ''}`}
-    >
-      <div className="window-bar">
-        <span className="window-app-name">Jever</span>
-        <span className="window-bar-right mono">A SPACE FOR CLEARER THINKING</span>
-      </div>
+    <div className={`app-shell ${sidebarOpen ? 'show-sidebar' : ''}`}>
+      <div className="window-bar" aria-hidden="true" />
       {sidebarOpen && (
         <button
           className="mobile-scrim"
@@ -472,9 +465,7 @@ export default function App() {
       <aside className="sidebar" aria-label="Conversations">
         <div className="brand">
           <Glider />
-          <span>
-            Jever<span className="brand-period">.</span>
-          </span>
+          <span>Jever</span>
           <IconButton
             label="Close navigation"
             className="mobile-only"
@@ -483,28 +474,20 @@ export default function App() {
             <X size={18} />
           </IconButton>
         </div>
-        <button className="primary new-conversation" disabled={busy} onClick={newConversation}>
+        <button className="new-conversation" disabled={busy} onClick={newConversation}>
           <Plus size={18} />
-          <span>New conversation</span>
+          <span>New chat</span>
         </button>
         <label className="search">
           <MagnifyingGlass size={16} />
           <input
             ref={searchRef}
             aria-label="Search conversations"
-            placeholder="Search conversations"
+            placeholder="Search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-          <span className="key-hint">⌘ K</span>
         </label>
-        <button className="sidebar-link" onClick={() => setPresetsOpen(true)}>
-          <SquaresFour size={18} />
-          Your presets<span>{workspace.presets.length}</span>
-        </button>
-        <div className="history-label mono">
-          CONVERSATIONS<span>{workspace.conversations.length.toString().padStart(2, '0')}</span>
-        </div>
         <div className="history-list">
           {filtered.map((c) => (
             <button
@@ -514,72 +497,27 @@ export default function App() {
               disabled={busy && c.id !== selected}
             >
               {c.pinned ? <PushPin size={16} /> : <ChatCircle size={16} />}
-              <span>
-                {c.title}
-                <small>
-                  {new Date(c.updatedAt).toLocaleDateString(undefined, {
-                    month: 'short',
-                    day: 'numeric',
-                  })}{' '}
-                  · {c.turns.length} {c.turns.length === 1 ? 'decision' : 'decisions'}
-                </small>
-              </span>
+              <span>{c.title}</span>
             </button>
           ))}
-          {!filtered.length && (
-            <div className="history-empty">
-              <ChatCircle size={24} />
-              <p>{search ? 'No conversations found.' : 'A clean slate.'}</p>
-              <small>
-                {search ? 'Try a different search.' : 'Your conversations will find a home here.'}
-              </small>
-            </div>
-          )}
+          {!filtered.length && search && <p className="history-empty">No results</p>}
         </div>
         <div className="sidebar-bottom">
-          <div className="engine-label mono">
-            <span className={`status-dot ${configured ? 'connected' : ''}`} />
-            {configured ? 'API KEY SAVED' : 'READY WHEN YOU ARE'}
-          </div>
           <button className="account-button" onClick={() => setSettingsOpen(true)}>
-            <span className="account-avatar">
-              <Glider />
-            </span>
-            <span>
-              Personal workspace
-              <small>
-                {configured ? 'Jev latest · OpenRouter' : 'Connect your OpenRouter key'}
-              </small>
-            </span>
             <GearSix size={19} />
+            <span>Settings</span>
           </button>
         </div>
       </aside>
-      <main className="main-panel">
+      <main className={`main-panel ${conversation ? 'has-conversation' : 'new-chat'}`}>
         <header className="main-header">
           <div className="header-title">
-            <IconButton
-              label="Toggle navigation"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="mobile-only"
-            >
+            <IconButton label="Toggle navigation" onClick={() => setSidebarOpen(!sidebarOpen)}>
               <SidebarSimple size={20} />
             </IconButton>
-            <span>{conversation?.title ?? 'New conversation'}</span>
+            {conversation && <span>{conversation.title}</span>}
           </div>
           <div className="header-actions">
-            <button className="model-badge" onClick={() => void bridge.openExternal('model')}>
-              <Glider />
-              Jev latest
-              <ArrowUpRight size={12} />
-            </button>
-            <IconButton
-              label="Customize decisions"
-              onClick={() => setInspectorOpen(!inspectorOpen)}
-              className={inspectorOpen ? 'selected' : ''}
-            >
-              <SlidersHorizontal size={20} />
-            </IconButton>
             {conversation && (
               <div className="conversation-menu">
                 <IconButton label="Conversation actions" onClick={() => setMenuOpen(!menuOpen)}>
@@ -653,74 +591,8 @@ export default function App() {
             Changes could not be saved: {saveError}
           </div>
         )}
-        <div className={`conversation-scroll ${conversation ? '' : 'empty'}`}>
-          {!conversation ? (
-            <section className="welcome">
-              <div className="welcome-art" aria-hidden="true">
-                <img src="/dither.png" alt="" />
-                <div className="art-caption mono">
-                  SMALL PATTERNS.
-                  <br />
-                  BIG POSSIBILITIES.
-                </div>
-                <div className="retro-window">
-                  <div className="retro-title mono">
-                    <span>JEV / SYSTEM ONE</span>
-                    <span>▱ ×</span>
-                  </div>
-                  <div className="retro-content">
-                    <div className="glider-grid">
-                      <Glider large />
-                    </div>
-                    <span className="mono">
-                      A little context.
-                      <br />A clearer answer.
-                      <span className="retro-cursor" />
-                    </span>
-                  </div>
-                </div>
-                <span className="art-coordinate mono">[ 01 / ∞ ]</span>
-              </div>
-              <div className="welcome-copy">
-                <div className="welcome-label mono">INTELLIGENCE, A LITTLE DIFFERENT.</div>
-                <h1>
-                  Let's make sense
-                  <br />
-                  of what comes next<span>.</span>
-                </h1>
-                <p>
-                  Bring your context. Ask a focused question.
-                  <br />
-                  Let Jev help you make the call.
-                </p>
-              </div>
-              <div className="starter-list">
-                {STARTERS.map((item, index) => (
-                  <button key={item.id} onClick={() => starter(index)}>
-                    <span className="starter-icon">
-                      {index === 0 ? (
-                        <ChatCircle size={20} />
-                      ) : index === 1 ? (
-                        <Lightning size={20} />
-                      ) : (
-                        <Scales size={20} />
-                      )}
-                    </span>
-                    <span>
-                      <strong>{item.title}</strong>
-                      <small>{item.subtitle}</small>
-                    </span>
-                    <ArrowRight size={17} />
-                  </button>
-                ))}
-              </div>
-              <button className="example-link text-button" onClick={openExample}>
-                <BookOpen size={15} />
-                Take a look at an example
-                <ArrowUpRight size={13} />
-              </button>
-            </section>
-          ) : (
+        {conversation ? (
+          <div className="conversation-scroll">
             <div className="conversation-content">
               {conversation.turns.map((turn) => (
                 <Results
@@ -738,9 +610,10 @@ export default function App() {
               ))}
               <div ref={bottomRef} />
             </div>
-          )}
-        </div>
+          </div>
+        ) : null}
         <div className="composer-area">
+          {!conversation && <h1>What’s on your mind?</h1>}
           {error && (
             <div className="composer-error" role="alert">
               <span>{error}</span>
@@ -775,11 +648,7 @@ export default function App() {
             <textarea
               ref={textRef}
               aria-label="Context for Jev"
-              placeholder={
-                conversation
-                  ? 'Add more context, or try another decision…'
-                  : 'Give Jev some context…'
-              }
+              placeholder="Message Jever"
               rows={3}
               maxLength={100000}
               value={draft}
@@ -817,24 +686,51 @@ export default function App() {
                     event.target.value = ''
                   }}
                 />
-                <span className="composer-divider" />
-                <button
-                  type="button"
-                  className="recipe-button"
-                  onClick={() => setInspectorOpen(true)}
-                >
-                  <SlidersHorizontal size={14} />
-                  {Object.keys(questions).length}{' '}
-                  {Object.keys(questions).length === 1 ? 'question' : 'questions'}
-                  <span className="recipe-types">
-                    {[...new Set(Object.values(questions).map((q) => q.type))].join(' + ')}
-                  </span>
-                </button>
+                <Popover.Root open={inspectorOpen} onOpenChange={setInspectorOpen}>
+                  <Popover.Trigger asChild>
+                    <button type="button" className="recipe-button" aria-label="Questions">
+                      <SlidersHorizontal size={16} />
+                      Questions
+                      {Object.keys(questions).length > 1 && (
+                        <span className="question-count">{Object.keys(questions).length}</span>
+                      )}
+                      <CaretDown size={12} />
+                    </button>
+                  </Popover.Trigger>
+                  <Popover.Portal>
+                    <Popover.Content
+                      className="questions-popover"
+                      side="top"
+                      align="start"
+                      sideOffset={12}
+                      collisionPadding={16}
+                      aria-label="Questions"
+                      onCloseAutoFocus={(event) => {
+                        if (namedDialog || presetsOpen || settingsOpen) event.preventDefault()
+                      }}
+                    >
+                      <QuestionEditor
+                        questions={questions}
+                        onChange={changeQuestions}
+                        settings={settings}
+                        setSettings={setSettings}
+                        onSavePreset={() => {
+                          setInspectorOpen(false)
+                          setName('')
+                          setNamedDialog('preset')
+                        }}
+                        onPresets={() => {
+                          setInspectorOpen(false)
+                          setPresetsOpen(true)
+                        }}
+                        onClose={() => setInspectorOpen(false)}
+                        disabled={busy}
+                      />
+                    </Popover.Content>
+                  </Popover.Portal>
+                </Popover.Root>
               </div>
               <div className="flex items-center gap-3">
-                <span className="character-count mono">
-                  {draft.length > 0 ? draft.length.toLocaleString() : ''}
-                </span>
                 {busy ? (
                   <button
                     type="button"
@@ -857,34 +753,8 @@ export default function App() {
               </div>
             </div>
           </form>
-          <div className="composer-foot">
-            <span>
-              <Glider />
-              Powered only by Jev.
-            </span>
-            <span>Decisions, with confidence.</span>
-          </div>
         </div>
       </main>
-      {inspectorOpen && (
-        <button
-          className="inspector-scrim"
-          aria-label="Close customization panel"
-          onClick={() => setInspectorOpen(false)}
-        />
-      )}
-      <QuestionEditor
-        questions={questions}
-        onChange={changeQuestions}
-        settings={settings}
-        setSettings={setSettings}
-        onSavePreset={() => {
-          setName('')
-          setNamedDialog('preset')
-        }}
-        onClose={() => setInspectorOpen(false)}
-        disabled={busy}
-      />
       <SettingsDialog
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
@@ -897,8 +767,8 @@ export default function App() {
       <Modal
         open={presetsOpen}
         onOpenChange={setPresetsOpen}
-        title="Your decision library."
-        description="A familiar starting point for whatever comes next."
+        title="Presets"
+        description="Saved questions and starters."
       >
         <div className="preset-list">
           {STARTERS.map((item, index) => (
@@ -947,24 +817,33 @@ export default function App() {
             </div>
           ))}
         </div>
-        <p className="hint">Build a recipe in the customization panel, then save it as a preset.</p>
+        <button
+          className="text-button"
+          onClick={() => {
+            setPresetsOpen(false)
+            openExample()
+          }}
+        >
+          View example
+        </button>
       </Modal>
       <Modal
+        descriptionVisible={namedDialog === 'delete'}
         open={namedDialog !== null}
         onOpenChange={() => setNamedDialog(null)}
         title={
           namedDialog === 'delete'
             ? 'Delete this conversation?'
             : namedDialog === 'rename'
-              ? 'A name that makes sense.'
-              : 'Keep this recipe.'
+              ? 'Rename chat'
+              : 'Save preset'
         }
         description={
           namedDialog === 'delete'
             ? 'This removes the conversation from this device. Export it first if you want a copy.'
             : namedDialog === 'rename'
-              ? 'Make this conversation easier to find later.'
-              : 'Save these questions and their criteria to your library.'
+              ? 'Choose a name.'
+              : 'Choose a name for these questions.'
         }
       >
         <form
@@ -1004,7 +883,6 @@ export default function App() {
           {toast}
         </div>
       )}
-      {!isDesktop && <span className="preview-label mono">BROWSER PREVIEW</span>}
     </div>
   )
 }

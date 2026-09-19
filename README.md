@@ -2,7 +2,7 @@
 
 A personal desktop workspace for [TypeSafe Jev](https://openrouter.ai/~typesafe/jev-latest), built with pnpm, Electron, TypeScript, React, and Tailwind CSS.
 
-![Jever design concept](design/jever-concept.png)
+The original generated concept is preserved in [design](design/README.md). The current interface uses a minimal conversation layout with question controls inside the composer.
 
 ## Run
 
@@ -22,7 +22,7 @@ pnpm start
 
 The locally packaged Apple Silicon app is `release/mac-arm64/Jever.app`. It uses ad-hoc signing for local use. Public distribution requires your own signing and notarization setup.
 
-Open **Personal workspace → Connection**, add an OpenRouter API key, and save. An OS keychain is required. Your account needs access to the Jev model and sufficient OpenRouter credits.
+Open **Settings → Connection**, add an OpenRouter API key, and save. An OS keychain is required. Your account needs access to the Jev model and sufficient OpenRouter credits.
 
 For a browser-only UI preview, run `pnpm dev:web` and open `http://127.0.0.1:5173`. Live requests and credentials are deliberately available only in Electron. The preview uses a separate local browser workspace.
 
@@ -32,10 +32,10 @@ Jev is a typed decision model, not a prose-generating chat model. Jever provides
 
 Every live request goes to `https://openrouter.ai/api/alpha/decisions`, with `model: "~typesafe/jev-latest"`. OpenRouter resolves that alias to the current Jev version. Model fallbacks are disabled.
 
-1. Choose a starter or write your own question in **Make it yours**.
+1. Click **Questions** inside the message bar. Write a question or choose a starter from **Presets**.
 2. Define choices, ordered score levels, or a yes/no condition.
 3. Paste the context or attach text files, then run the decision.
-4. Inspect the answer, probabilities, confidence, usage, and response JSON.
+4. Read the answer. Expand **Details** for probabilities, usage, and response JSON.
 
 The built-in example is a labeled, local illustration adapted from OpenRouter's documented response. It does not call the API. Example usage figures belong to that documentation example.
 
@@ -48,7 +48,7 @@ The built-in example is a labeled, local illustration adapted from OpenRouter's 
 - Persistent background context and optional conversation history.
 - Review thresholds. Choice and Score use the provider's reported confidence. Noul uses the probability of its yes/no verdict, not an invented confidence value. Low-confidence results remain visible.
 - Text, Markdown, JSON, CSV, and source-code attachments: up to five files, each under 100 KB, with 100,000 total characters. Combined request limit: 120,000 characters. This conservative character limit does not guarantee a request fits Jev's token limit for every language or dataset.
-- Paper, After hours, or system theme; rose, sage, or blue accents; message text size.
+- Light, dark, or system theme; rose, sage, or blue accents; message text size.
 - Enter-to-send preference, configurable timeout, and private provider routing.
 - Search, pin, rename, delete, and export conversations. Export/import complete workspace backups.
 - Keyboard shortcuts: Cmd/Ctrl+N for a new conversation, Cmd/Ctrl+K for search, Cmd/Ctrl+, for settings. Shift+Enter inserts a newline.
@@ -89,7 +89,7 @@ JEVER_USER_DATA=/tmp/jever-smoke pnpm start
 - `src/main`: desktop window, encrypted credentials, persistence, fixed OpenRouter transport.
 - `src/preload`: typed IPC bridge.
 - `src/shared`: request/response schemas, settings, workspace types, and decision semantics.
-- `src/renderer`: React interface, Tailwind integration, local fonts, generated artwork.
+- `src/renderer`: React interface, Tailwind integration, and local fonts.
 - `tests`: protocol, transport, validation, and security tests.
 - `design`: the AI-generated concept produced before implementation.
 

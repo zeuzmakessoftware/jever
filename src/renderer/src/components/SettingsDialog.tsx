@@ -71,8 +71,8 @@ export function SettingsDialog({
         setKey('')
         onOpenChange(value)
       }}
-      title="Your Jever."
-      description="A few preferences to make this space your own."
+      title="Settings"
+      description="Connection, appearance, and preferences."
       wide
     >
       <div className="settings-layout">
@@ -97,10 +97,7 @@ export function SettingsDialog({
                 <Key size={22} />
                 <h3>Connect to OpenRouter</h3>
               </div>
-              <p>
-                Jever uses your OpenRouter account and only Jev latest. Your key is encrypted by
-                your operating system and never exposed to the conversation view.
-              </p>
+              <p>Your key is stored securely on this device.</p>
               <div className="connection-status">
                 <span className={`status-dot ${configured ? 'connected' : ''}`} />
                 {configured ? 'API key saved' : 'No API key connected'}
@@ -144,24 +141,23 @@ export function SettingsDialog({
                 Get an OpenRouter key <ArrowUpRight size={14} />
               </button>
               <div className="model-fixed">
-                <span className="mono">MODEL</span>
                 <strong>~typesafe/jev-latest</strong>
-                <p>Always the latest Jev. No other models or fallback models.</p>
+                <p>Jev latest via OpenRouter.</p>
               </div>
             </>
           )}
           {tab === 'appearance' && (
             <>
-              <h3>Set the mood.</h3>
+              <h3>Appearance</h3>
               <label className="field">
                 <span>Theme</span>
                 <select
                   value={settings.theme}
                   onChange={(event) => update({ theme: event.target.value as Settings['theme'] })}
                 >
-                  <option value="light">Paper</option>
-                  <option value="dark">After hours</option>
-                  <option value="system">Match system</option>
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                  <option value="system">System</option>
                 </select>
               </label>
               <span className="field-label">Accent</span>
@@ -194,7 +190,7 @@ export function SettingsDialog({
           )}
           {tab === 'behavior' && (
             <>
-              <h3>Work your way.</h3>
+              <h3>Behavior</h3>
               <label className="toggle-row">
                 <span>
                   Enter to send<small>Shift + Enter always adds a new line.</small>
@@ -244,7 +240,7 @@ export function SettingsDialog({
           )}
           {tab === 'data' && (
             <>
-              <h3>Yours to keep.</h3>
+              <h3>Data</h3>
               <p>
                 Your conversations and presets are saved on this device. Context is sent to
                 OpenRouter only when you run a decision. Conversation files and exported backups are

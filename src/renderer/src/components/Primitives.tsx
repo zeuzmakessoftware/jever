@@ -44,6 +44,7 @@ export function Modal({
   description,
   children,
   wide = false,
+  descriptionVisible = false,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -51,6 +52,7 @@ export function Modal({
   description: string
   children: ReactNode
   wide?: boolean
+  descriptionVisible?: boolean
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -65,7 +67,9 @@ export function Modal({
               </button>
             </Dialog.Close>
           </div>
-          <Dialog.Description className="dialog-description">{description}</Dialog.Description>
+          <Dialog.Description className={descriptionVisible ? 'dialog-description' : 'sr-only'}>
+            {description}
+          </Dialog.Description>
           {children}
         </Dialog.Content>
       </Dialog.Portal>
