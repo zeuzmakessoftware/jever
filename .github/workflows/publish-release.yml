@@ -1,0 +1,85 @@
+name: Publish verified release
+on:
+  workflow_dispatch:
+    inputs:
+      build_run:
+        description: Successful installer build run ID
+        required: true
+      version:
+        description: Version without v prefix
+        required: true
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN: ${{ inputs.build_run }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN" > /tmp/build.json
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          run = json.loads(Path('/tmp/build.json').read_text())
+          assert run['conclusion'] == 'success'
+          assert run['path'] == '.github/workflows/release-build.yml'
+          assert run['head_repository']['full_name'] == os.environ['GITHUB_REPOSITORY']
+          version = os.environ['VERSION']
+          assert re.fullmatch(r'\d+\.\d+\.\d+', version)
+          assert json.loads(Path('package.json').read_text())['version'] == version
+          assert Path(f'.github/release-notes/v{version}.md').is_file()
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f"BUILD_SHA={run['head_sha']}\n")
+          Path("/tmp/build-sha").write_text(run["head_sha"])
+          PY
+          BUILD_SHA=$(cat /tmp/build-sha)
+          gh api "repos/$GITHUB_REPOSITORY/contents/package.json?ref=$BUILD_SHA" --jq .content | base64 --decode > /tmp/build-package.json
+          python3 -c 'import json,os; assert json.load(open("/tmp/build-package.json"))["version"] == os.environ["VERSION"]'
+      - name: Download and verify installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN: ${{ inputs.build_run }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh run download "$BUILD_RUN" --pattern 'jever-*' --dir artifacts
+          python3 - <<'PY'
+          import hashlib, os, plistlib, shutil, zipfile
+          from pathlib import Path
+          version = os.environ['VERSION']
+          expected = {f'Jever-{version}-mac-{arch}.{ext}' for arch in ['arm64','x64'] for ext in ['dmg','zip']}
+          expected.add(f'Jever-{version}-win-x64.exe')
+          files = list(Path('artifacts').rglob('*.*'))
+          assert {p.name for p in files} == expected
+          assert len(files) == len(expected)
+          Path('assets').mkdir()
+          sums = []
+          for p in sorted(files):
+              assert p.stat().st_size > 1_000_000
+              if p.suffix == '.zip':
+                  with zipfile.ZipFile(p) as z:
+                      assert z.testzip() is None
+                      info = plistlib.loads(z.read('Jever.app/Contents/Info.plist'))
+                      assert info['CFBundleShortVersionString'] == version
+              elif p.suffix == '.exe':
+                  with p.open('rb') as f: assert f.read(2) == b'MZ'
+              elif p.suffix == '.dmg':
+                  with p.open('rb') as f:
+                      f.seek(-512, 2)
+                      assert f.read(4) == b'koly'
+              digest = hashlib.file_digest(p.open('rb'), 'sha256').hexdigest()
+              sums.append(f'{digest}  {p.name}')
+              shutil.copy2(p, Path('assets') / p.name)
+          Path('assets/SHA256SUMS.txt').write_text('\n'.join(sums)+'\n')
+          PY
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh release create "v$VERSION" assets/* --target "$BUILD_SHA" --title "Jever v$VERSION" --notes-file ".github/release-notes/v$VERSION.md" --latest
