@@ -1,107 +1,77 @@
-# Jever
+<h1 align="center">Jever</h1>
 
-A personal desktop workspace for [TypeSafe Jev](https://openrouter.ai/~typesafe/jev-latest), built with pnpm, Electron, TypeScript, React, and Tailwind CSS.
+<p align="center">A desktop home for <a href="https://openrouter.ai/~typesafe/jev-latest">TypeSafe Jev</a>.</p>
 
-The original generated concept is preserved in [design](design/README.md). The current interface uses a minimal conversation layout with question controls inside the composer.
+<p align="center">
+  <a href="#get-started">Get started</a> ·
+  <a href="#using-jever">Using Jever</a> ·
+  <a href="docs/development.md">Development</a>
+</p>
 
-## Run
+![Jever on macOS, showing a fruit choice with its confidence and question controls in the message bar](docs/images/jever.png)
 
-Use Node.js 22.12+ (tested with Node 25) and pnpm 9.9+.
+Jev picks between options, scores against a rubric, and answers yes/no questions. Jever gives you a place to try those decisions: write a question, add some context, and see the answer alongside its confidence.
+
+Conversations stay on your machine. Bring your own OpenRouter key.
+
+## Get started
+
+You'll need **Node.js 22.12+**, **pnpm 9.9+**, and an [OpenRouter API key](https://openrouter.ai/keys) with credits and access to Jev.
 
 ```sh
+git clone https://github.com/zeuzmakessoftware/jever.git
+cd jever
 pnpm install
 pnpm dev
 ```
 
-For a production build:
+Open **Settings → Connection**, paste your key, and save. Jever uses your operating system's secure storage to encrypt the key.
 
-```sh
-pnpm build
-pnpm start
-```
+Tested on macOS with Apple Silicon. Windows and Linux packaging haven't been verified yet.
 
-The locally packaged Apple Silicon app is `release/mac-arm64/Jever.app`. It uses ad-hoc signing for local use. Public distribution requires your own signing and notarization setup.
+## Using Jever
 
-Open **Settings → Connection**, add an OpenRouter API key, and save. An OS keychain is required. Your account needs access to the Jev model and sufficient OpenRouter credits.
+Click **Questions** in the message bar to set up what you want Jev to decide. Start with a preset or write your own.
 
-For a browser-only UI preview, run `pnpm dev:web` and open `http://127.0.0.1:5173`. Live requests and credentials are deliberately available only in Electron. The preview uses a separate local browser workspace.
+| Question type | What you give it                    | What comes back             |
+| ------------- | ----------------------------------- | --------------------------- |
+| **Choice**    | A question and possible answers     | A selected option           |
+| **Score**     | A question and ordered score levels | A score against your rubric |
+| **Noul**      | A yes/no condition                  | A boolean verdict           |
 
-## What Jev can do
+Paste context into the message bar or attach text files, then send. Open **Details** under an answer to inspect probabilities, usage, and the response JSON. A result below your review threshold stays visible with a review flag.
 
-Jev is a typed decision model, not a prose-generating chat model. Jever provides a familiar conversation interface for **Choice**, **Score**, and **Noul** decisions. It does not invent a chat response, switch to another model, or emulate unsupported streaming, voice, image analysis, or web search.
+You can ask several questions in one request, save question sets as presets, and edit their JSON when you need more control. Background context and optional conversation history carry information between turns.
 
-Every live request goes to `https://openrouter.ai/api/alpha/decisions`, with `model: "~typesafe/jev-latest"`. OpenRouter resolves that alias to the current Jev version. Model fallbacks are disabled.
+The sidebar keeps your conversations searchable. You can pin, rename, export, or delete them, and back up the whole workspace from Settings. Light and dark themes, accent colors, and text size live there too.
 
-1. Click **Questions** inside the message bar. Write a question or choose a starter from **Presets**.
-2. Define choices, ordered score levels, or a yes/no condition.
-3. Paste the context or attach text files, then run the decision.
-4. Read the answer. Expand **Details** for probabilities, usage, and response JSON.
+**Shortcuts:** `⌘/Ctrl+N` starts a chat, `⌘/Ctrl+K` searches, and `⌘/Ctrl+,` opens Settings. `Shift+Enter` adds a line.
 
-The built-in example is a labeled, local illustration adapted from OpenRouter's documented response. It does not call the API. Example usage figures belong to that documentation example.
+## Where your data goes
 
-## Customization
+Your key is encrypted locally and excluded from workspace exports. Conversations and backups are stored as **unencrypted JSON**.
 
-- Multiple independent questions in a single request; up to 50 questions per recipe.
-- A visual builder for Choice options, Score rubrics, and Noul criteria.
-- JSON editing for custom question IDs and structured instructions or criteria.
-- Saved recipe presets and three starter workflows.
-- Persistent background context and optional conversation history.
-- Review thresholds. Choice and Score use the provider's reported confidence. Noul uses the probability of its yes/no verdict, not an invented confidence value. Low-confidence results remain visible.
-- Text, Markdown, JSON, CSV, and source-code attachments: up to five files, each under 100 KB, with 100,000 total characters. Combined request limit: 120,000 characters. This conservative character limit does not guarantee a request fits Jev's token limit for every language or dataset.
-- Light, dark, or system theme; rose, sage, or blue accents; message text size.
-- Enter-to-send preference, configurable timeout, and private provider routing.
-- Search, pin, rename, delete, and export conversations. Export/import complete workspace backups.
-- Keyboard shortcuts: Cmd/Ctrl+N for a new conversation, Cmd/Ctrl+K for search, Cmd/Ctrl+, for settings. Shift+Enter inserts a newline.
+When you run a decision, Jever sends the input, attachments, background context, and any enabled history to OpenRouter. Requests use `~typesafe/jev-latest` with model fallbacks disabled. The optional private routing setting asks for providers that decline data collection; this can reduce availability.
 
-## Data and security
+See [development notes](docs/development.md) for storage paths, transport details, and security boundaries.
 
-The renderer is sandboxed with context isolation and no Node integration. A narrow preload bridge validates sender frames, origins, request shapes, and response shapes. Remote navigation and unexpected permissions are denied. Packaged pages use the `jever://app` protocol and a content security policy. External links are restricted to three fixed destinations.
+## Working on it
 
-The API key is encrypted using Electron `safeStorage` and stays in the main process. It is never included in exports, logs, browser storage, or renderer responses. Linux's unencrypted `basic_text` backend is rejected. API requests use the fixed OpenRouter HTTPS endpoint.
-
-Conversation data and settings are stored locally as `workspace.json` in Electron's Jever user-data folder (`~/Library/Application Support/Jever` on macOS). These conversation files and exported backups are **not encrypted**. Input, attachments, background context, and optionally history are sent to OpenRouter when you run a decision. Private routing requests providers that decline data collection; it can reduce availability.
-
-Writes are serialized and use atomic replacement. Invalid saved data produces a recovery error instead of being silently overwritten. Interrupted requests can be retried. The model's results should be reviewed in context; the threshold is a UI review flag and does not execute external actions.
-
-## Development and verification
+Built with Electron, React, TypeScript, and Tailwind CSS.
 
 ```sh
 pnpm typecheck
 pnpm test
-pnpm format:check
 pnpm build
-pnpm package       # local application bundle
-pnpm dist          # distributable for the current platform
+pnpm start
 ```
 
-The Vitest suite covers model/endpoint locking, input validation, mixed question batches, transport headers, cancellation, missing keys, provider errors, malformed answers, confidence semantics, backup validation, and native renderer URL restrictions.
+`pnpm dev:web` runs a browser preview at `http://127.0.0.1:5173`. It has a separate local workspace; live requests and API keys are only available in the desktop app.
 
-Native launch and persisted conversations were tested on macOS Apple Silicon. Browser checks cover desktop and 390px layouts, dark mode, preset creation, missing-key handling, JSON errors, and rubric editing. No authenticated inference was performed because no OpenRouter key was supplied. Windows/Linux packaging and code signing for public distribution are not verified.
+For a local app bundle, run `pnpm package`. For a distributable on your current platform, run `pnpm dist`. Public macOS distribution needs signing and notarization configured separately.
 
-To isolate native smoke-test data:
+The [development notes](docs/development.md) cover tests and source layout. The original visual concepts are in [design](design/README.md).
 
-```sh
-JEVER_USER_DATA=/tmp/jever-smoke pnpm start
-```
+---
 
-## Project layout
-
-- `src/main`: desktop window, encrypted credentials, persistence, fixed OpenRouter transport.
-- `src/preload`: typed IPC bridge.
-- `src/shared`: request/response schemas, settings, workspace types, and decision semantics.
-- `src/renderer`: React interface, Tailwind integration, and local fonts.
-- `tests`: protocol, transport, validation, and security tests.
-- `design`: the AI-generated concept produced before implementation.
-
-## Sources
-
-The implementation was checked against the public documentation on September 18, 2026:
-
-- [TypeSafe introduction](https://docs.typesafe.ai/introduction)
-- [TypeSafe primitives](https://docs.typesafe.ai/primitives)
-- [TypeSafe API reference](https://docs.typesafe.ai/api)
-- [OpenRouter's current API schema](https://openrouter.ai/openapi.json), including `POST /api/alpha/decisions`
-- [Jev latest alias](https://openrouter.ai/~typesafe/jev-latest)
-- [Typesafe visual reference](https://typesafe.ai/)
-
-Jever is an independent application, inspired by Typesafe's imagery. It is not an official TypeSafe or OpenRouter product.
+Jever is an independent project for [TypeSafe Jev](https://docs.typesafe.ai/introduction). It isn't affiliated with TypeSafe or OpenRouter.
