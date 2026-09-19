@@ -1,6 +1,6 @@
 {
   "name": "jever",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "A personal desktop workspace for TypeSafe Jev decisions",
   "author": "Jever",
   "private": true,
@@ -48,7 +48,8 @@
         "AppImage"
       ],
       "category": "Utility"
-    }
+    },
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
   },
   "dependencies": {
     "@fontsource/geist": "^5.3.0",
