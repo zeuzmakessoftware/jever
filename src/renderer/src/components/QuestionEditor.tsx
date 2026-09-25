@@ -158,7 +158,7 @@ export function QuestionEditor({
                       <textarea
                         className="question-input"
                         aria-label={`Question ${index + 1}`}
-                        placeholder="What should Jev decide?"
+                        placeholder="What should the model decide?"
                         rows={2}
                         value={text(question.instructions)}
                         onChange={(e) => update(id, { ...question, instructions: e.target.value })}
@@ -335,7 +335,10 @@ export function QuestionEditor({
             <button
               type="button"
               className="text-button add-question"
-              disabled={Object.keys(questions).length >= 50}
+              disabled={
+                Object.keys(questions).length >=
+                (settings.connection.provider === 'ollaya' ? 256 : 50)
+              }
               onClick={addQuestion}
             >
               <Plus size={15} />

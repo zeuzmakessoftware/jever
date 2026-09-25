@@ -13,6 +13,9 @@ export const bridge: DesktopAPI = window.jever ?? {
   setKey: async () => {
     throw new Error('Open the Jever desktop app to securely connect your API key.')
   },
+  models: async () => {
+    throw new Error('Open the Jever desktop app to discover Ollaya models.')
+  },
   evaluate: async () => {
     throw new Error(
       'Run this decision in the Jever desktop app. Browser preview does not access API keys.',
@@ -21,6 +24,7 @@ export const bridge: DesktopAPI = window.jever ?? {
   cancel: async () => {},
   openExternal: async (destination) => {
     const links = {
+      ollaya: 'https://ollaya.dev/docs/quickstart',
       keys: 'https://openrouter.ai/settings/keys',
       docs: 'https://docs.typesafe.ai/',
       model: 'https://openrouter.ai/~typesafe/jev-latest',

@@ -71,12 +71,13 @@ export default function App() {
   const conversation = workspace.conversations.find((c) => c.id === selected)
   const settings = workspace.settings
   const busy = Boolean(running)
+  const local = settings.connection.provider === 'ollaya'
   const [systemDark, setSystemDark] = useState(
     () => matchMedia('(prefers-color-scheme: dark)').matches,
   )
 
   async function refreshKey() {
-    setConfigured((await bridge.keyStatus()).configured)
+    setConfigured((await bridge.keyStatus(settings.connection)).configured)
   }
   useEffect(() => {
     let active = true
@@ -108,6 +109,21 @@ export default function App() {
       active = false
     }
   }, [])
+  useEffect(() => {
+    let active = true
+    setConfigured(false)
+    bridge
+      .keyStatus(settings.connection)
+      .then((status) => {
+        if (active) setConfigured(status.configured)
+      })
+      .catch((error) => {
+        if (active) setError(message(error))
+      })
+    return () => {
+      active = false
+    }
+  }, [settings.connection.provider, settings.connection.baseUrl])
   useEffect(() => {
     if (!loaded) return
     bridge
@@ -209,7 +225,7 @@ export default function App() {
       for (const file of Array.from(files)) {
         if (!/\.(txt|md|json|csv|tsv|log|yaml|yml|js|ts|tsx|jsx|py|html|css)$/i.test(file.name))
           throw new Error(
-            'Attach a text, Markdown, JSON, CSV, or source-code file. Images and PDFs are not supported by Jev.',
+            'Attach a text, Markdown, JSON, CSV, or source-code file. Images and PDFs are not supported.',
           )
         if (file.size > 100_000)
           throw new Error(`${file.name} is too large. Choose a file under 100 KB.`)
@@ -239,7 +255,7 @@ export default function App() {
   }
   async function run(content = draft, recipe = questions, files = attachments) {
     if (busyRef.current || (!content.trim() && !files.length)) return
-    if (!configured) {
+    if (!local && !configured) {
       setSettingsOpen(true)
       return
     }
@@ -321,6 +337,7 @@ export default function App() {
         questions: recipe,
         timeout: settings.timeout,
         privateRouting: settings.privateRouting,
+        connection: settings.connection,
       })
       updateTurn(conversationId, turnId, { response, elapsed: performance.now() - started })
     } catch (error) {
@@ -518,6 +535,18 @@ export default function App() {
             {conversation && <span>{conversation.title}</span>}
           </div>
           <div className="header-actions">
+            <button
+              className="connection-picker"
+              title={
+                local
+                  ? `${settings.connection.model} · ${settings.connection.baseUrl}`
+                  : 'Jev via OpenRouter'
+              }
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Change decision provider"
+            >
+              {local ? `Ollaya · ${settings.connection.model}` : 'OpenRouter · Jev'}
+            </button>
             {conversation && (
               <div className="conversation-menu">
                 <IconButton label="Conversation actions" onClick={() => setMenuOpen(!menuOpen)}>
@@ -647,7 +676,7 @@ export default function App() {
             )}
             <textarea
               ref={textRef}
-              aria-label="Context for Jev"
+              aria-label="Decision context"
               placeholder="Message Jever"
               rows={3}
               maxLength={100000}

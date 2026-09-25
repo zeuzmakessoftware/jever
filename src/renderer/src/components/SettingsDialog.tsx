@@ -1,6 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowUpRight, Check, Key, DownloadSimple, UploadSimple } from '@phosphor-icons/react'
-import { type Settings, type Workspace, workspaceSchema } from '../../../shared/domain'
+import {
+  type Settings,
+  type Workspace,
+  type LocalModel,
+  connectionSchema,
+  workspaceSchema,
+} from '../../../shared/domain'
 import { bridge, download, isDesktop, message } from '../bridge'
 import { Modal } from './Primitives'
 
@@ -26,6 +32,59 @@ export function SettingsDialog({
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const settings = workspace.settings
+  const connection = settings.connection
+  const local = connection.provider === 'ollaya'
+  const [baseUrl, setBaseUrl] = useState(connection.baseUrl)
+  const [model, setModel] = useState(connection.model)
+  const [models, setModels] = useState<LocalModel[]>([])
+  const [checking, setChecking] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState('')
+  const checkId = useRef(0)
+  useEffect(() => {
+    setBaseUrl(connection.baseUrl)
+    setKey('')
+    setError('')
+    setModels([])
+    setConnectionStatus('')
+    setChecking(false)
+    checkId.current++
+  }, [connection.provider, connection.baseUrl])
+  useEffect(() => setModel(connection.model), [connection.model])
+  async function checkConnection() {
+    const id = ++checkId.current
+    setChecking(true)
+    setError('')
+    setConnectionStatus('')
+    try {
+      const found = await bridge.models(connection)
+      if (id !== checkId.current) return
+      setModels(found)
+      setConnectionStatus(
+        found.length
+          ? `Connected. ${found.length} installed models available.`
+          : 'Connected, but no models are installed. Run ollaya pull laya, then refresh.',
+      )
+    } catch (error) {
+      if (id === checkId.current) {
+        setModels([])
+        setError(message(error))
+      }
+    } finally {
+      if (id === checkId.current) setChecking(false)
+    }
+  }
+  function saveConnection() {
+    const parsed = connectionSchema.safeParse({ ...connection, baseUrl, model })
+    if (!parsed.success) {
+      setError(parsed.error.issues[0].message)
+      return
+    }
+    setBaseUrl(parsed.data.baseUrl)
+    setModel(parsed.data.model)
+    update({ connection: parsed.data })
+    setError('')
+    notify('Ollaya connection saved.')
+  }
   function update(value: Partial<Settings>) {
     setWorkspace({ ...workspace, settings: { ...settings, ...value } })
   }
@@ -33,10 +92,10 @@ export function SettingsDialog({
     setSaving(true)
     setError('')
     try {
-      await bridge.setKey(value)
+      await bridge.setKey(value, connection)
       setKey('')
       await refreshKey()
-      notify(value ? 'OpenRouter key saved securely.' : 'API key removed.')
+      notify(value ? `${local ? 'Ollaya' : 'OpenRouter'} key saved securely.` : 'API key removed.')
     } catch (error) {
       setError(message(error))
     } finally {
@@ -95,12 +154,97 @@ export function SettingsDialog({
             <>
               <div className="settings-section-title">
                 <Key size={22} />
-                <h3>Connect to OpenRouter</h3>
+                <h3>{local ? 'Connect to Ollaya' : 'Connect to OpenRouter'}</h3>
               </div>
-              <p>Your key is stored securely on this device.</p>
+              <label className="field">
+                <span>Decision provider</span>
+                <select
+                  value={connection.provider}
+                  disabled={saving}
+                  onChange={(event) =>
+                    update({
+                      connection: {
+                        ...connection,
+                        provider: event.target.value as Settings['connection']['provider'],
+                      },
+                    })
+                  }
+                >
+                  <option value="openrouter">OpenRouter · Jev</option>
+                  <option value="ollaya">Ollaya · Local models</option>
+                </select>
+              </label>
+              {local && (
+                <>
+                  <p>
+                    Run models on your own Ollaya server. Start it with <code>ollaya serve</code>{' '}
+                    and install a model with <code>ollaya pull laya</code>.
+                  </p>
+                  <label className="field">
+                    <span>Server URL</span>
+                    <input
+                      type="url"
+                      value={baseUrl}
+                      spellCheck={false}
+                      disabled={saving}
+                      onChange={(event) => setBaseUrl(event.target.value)}
+                      placeholder="http://localhost:11435"
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Model</span>
+                    <input
+                      list="ollaya-models"
+                      value={model}
+                      spellCheck={false}
+                      onChange={(event) => setModel(event.target.value)}
+                      placeholder="laya"
+                    />
+                    <datalist id="ollaya-models">
+                      {models.map((item) => (
+                        <option key={item.name} value={item.name}>
+                          {item.description}
+                        </option>
+                      ))}
+                    </datalist>
+                  </label>
+                  <div className="flex gap-2">
+                    <button className="primary" disabled={saving} onClick={saveConnection}>
+                      Save connection
+                    </button>
+                    <button
+                      className="outline"
+                      disabled={
+                        !isDesktop ||
+                        checking ||
+                        baseUrl !== connection.baseUrl ||
+                        model !== connection.model
+                      }
+                      onClick={() => void checkConnection()}
+                    >
+                      {checking ? 'Checking…' : 'Test & refresh models'}
+                    </button>
+                  </div>
+                  {connectionStatus && (
+                    <p className="hint" role="status">
+                      {connectionStatus}
+                    </p>
+                  )}
+                  <p className="hint">
+                    Save URL or model changes before testing. Context, attachments, and enabled
+                    history go to this server. Local servers need no API key unless authentication
+                    is enabled.
+                  </p>
+                </>
+              )}
+              <p>Your keys are stored securely on this device.</p>
               <div className="connection-status">
                 <span className={`status-dot ${configured ? 'connected' : ''}`} />
-                {configured ? 'API key saved' : 'No API key connected'}
+                {configured
+                  ? 'API key saved'
+                  : local
+                    ? 'No API key saved · optional'
+                    : 'No API key connected'}
               </div>
               {!isDesktop && (
                 <div className="notice">
@@ -109,21 +253,29 @@ export function SettingsDialog({
                 </div>
               )}
               <label className="field">
-                <span>{configured ? 'Replace API key' : 'OpenRouter API key'}</span>
+                <span>
+                  {configured
+                    ? 'Replace API key'
+                    : local
+                      ? 'Ollaya API key (optional)'
+                      : 'OpenRouter API key'}
+                </span>
                 <input
                   type="password"
                   autoComplete="off"
                   spellCheck={false}
                   value={key}
                   onChange={(event) => setKey(event.target.value)}
-                  placeholder="sk-or-v1-…"
+                  placeholder={local ? 'Server API key' : 'sk-or-v1-…'}
                   disabled={!isDesktop}
                 />
               </label>
               <div className="flex gap-2">
                 <button
                   className="primary"
-                  disabled={!key.trim() || saving || !isDesktop}
+                  disabled={
+                    !key.trim() || saving || !isDesktop || (local && baseUrl !== connection.baseUrl)
+                  }
                   onClick={() => void saveKey(key)}
                 >
                   {saving ? 'Saving…' : 'Save API key'}
@@ -136,13 +288,13 @@ export function SettingsDialog({
               </div>
               <button
                 className="text-button external-button"
-                onClick={() => void bridge.openExternal('keys')}
+                onClick={() => void bridge.openExternal(local ? 'ollaya' : 'keys')}
               >
-                Get an OpenRouter key <ArrowUpRight size={14} />
+                {local ? 'Ollaya setup guide' : 'Get an OpenRouter key'} <ArrowUpRight size={14} />
               </button>
               <div className="model-fixed">
-                <strong>~typesafe/jev-latest</strong>
-                <p>Jev latest via OpenRouter.</p>
+                <strong>{local ? connection.model : '~typesafe/jev-latest'}</strong>
+                <p>{local ? 'Via your Ollaya server.' : 'Jev latest via OpenRouter.'}</p>
               </div>
             </>
           )}
@@ -214,13 +366,14 @@ export function SettingsDialog({
               </label>
               <label className="toggle-row">
                 <span>
-                  Private provider routing
+                  Private provider routing (OpenRouter)
                   <small>
                     Only use providers that decline data collection. Availability may be reduced.
                   </small>
                 </span>
                 <input
                   type="checkbox"
+                  disabled={local}
                   checked={settings.privateRouting}
                   onChange={(event) => update({ privateRouting: event.target.checked })}
                 />
@@ -234,6 +387,8 @@ export function SettingsDialog({
                   <option value={30}>30 seconds</option>
                   <option value={60}>60 seconds</option>
                   <option value={120}>120 seconds</option>
+                  <option value={300}>5 minutes · model loading</option>
+                  <option value={600}>10 minutes</option>
                 </select>
               </label>
             </>
@@ -242,9 +397,9 @@ export function SettingsDialog({
             <>
               <h3>Data</h3>
               <p>
-                Your conversations and presets are saved on this device. Context is sent to
-                OpenRouter only when you run a decision. Conversation files and exported backups are
-                not encrypted.
+                Your conversations and presets are saved on this device. Context is sent to your
+                selected provider only when you run a decision. Conversation files and exported
+                backups are not encrypted.
               </p>
               <div className="data-stat">
                 <strong>{workspace.conversations.length}</strong>

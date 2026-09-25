@@ -55,6 +55,12 @@ export function Results({
       ) : turn.response ? (
         <>
           {turn.demo && <p className="demo-notice">Example from the docs. No live request.</p>}
+          {turn.response.state_truncated && (
+            <p className="notice" role="status">
+              Ollaya shortened the context to fit this model. Part of your input was not evaluated.
+              Use a shorter context or a larger-context model.
+            </p>
+          )}
           <div className="answers">
             {Object.entries(turn.response.answers).map(([id, answer]) => {
               const question = turn.questions[id]

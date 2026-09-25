@@ -1022,6 +1022,18 @@ summary {
   grid-template-columns: 126px minmax(0, 1fr);
   gap: 24px;
 }
+.connection-picker {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 8px;
+}
+.settings-body .flex {
+  flex-wrap: wrap;
+}
 .settings-nav {
   display: flex;
   flex-direction: column;
